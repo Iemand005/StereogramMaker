@@ -1,4 +1,18 @@
-const shader = `
+const vertShader = `
+attribute vec3 position; // The x,y,z coordinates of our rectangle corners
+varying vec2 vUv;        // This passes the coordinates to the Pixel Shader
+
+void main() {
+    // 1. Pass the position to the fragment shader as a UV (0 to 1)
+    // Most full-screen quads go from -1 to 1, so we map that to 0 to 1
+    vUv = position.xy * 0.5 + 0.5;
+
+    // 2. Tell the GPU where the vertex is in 3D space
+    gl_Position = vec4(position, 1.0);
+}
+`;
+
+const fragShader = `
 precision highp float;
 uniform vec2 iResolution;
 uniform sampler2D iChannel0; // Your Depth Map
@@ -44,3 +58,19 @@ void main() {
 }
 `;
 
+/** @type {HTMLCanvasElement} */
+const canvas = document.getElementById('glCanvas');
+const gl = canvas.getContext('webgl');
+
+function createShader(gl, type, source) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, source);
+    gl.compileShader(s);
+    return s;
+}
+
+const program = gl.createProgram();
+gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vertSource));
+gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fragSource));
+gl.linkProgram(program);
+gl.useProgram(program);
