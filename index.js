@@ -1,4 +1,9 @@
 const shader = `
+precision highp float;
+uniform vec2 iResolution;
+uniform sampler2D iChannel0; // Your Depth Map
+uniform sampler2D iChannel1;
+
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
     float numTiles = 6.0;
@@ -32,6 +37,10 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // Output to screen
     vec2 patternUV = vec2(currX / tileWidth, y / iResolution.y);
     fragColor = texture(iChannel0, patternUV);
+}
+
+void main() {
+    mainImage(gl_FragColor, gl_FragCoord.xy);
 }
 `;
 
