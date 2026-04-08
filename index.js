@@ -15,8 +15,9 @@ void main() {
 const fragShader = `
 precision highp float;
 uniform vec2 iResolution;
-uniform sampler2D iChannel0; // Your Depth Map
+uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
+varying vec2 vUv;
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
@@ -57,7 +58,9 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
 void main() {
     // mainImage(gl_FragColor, gl_FragCoord.xy);
-    gl_FragColor = vec4(1, 1, 0, 1);
+    // vec4 col = texture2D(iChannel0, vUv);
+    // gl_FragColor = col;
+    gl_FragColor = texture2D(iChannel0, vUv);
 }
 `;
 
@@ -86,7 +89,6 @@ gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fragShader));
 gl.linkProgram(program);
 gl.useProgram(program);
 
-// Create a Square (Full-screen Quad)
 const buffer = gl.createBuffer();
 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
@@ -106,9 +108,12 @@ function loadTexture(url, index) {
     gl.bindTexture(gl.TEXTURE_2D, tex);
     
     // Set wrapping to REPEAT so the pattern tiles
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 
     const img = new Image();
     img.onload = () => {
@@ -119,6 +124,7 @@ function loadTexture(url, index) {
     };
     img.crossOrigin = "anonymous";
     img.src = url;
+    document.body.appendChild(img);
     return tex;
 }
 
