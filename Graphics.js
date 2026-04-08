@@ -20,6 +20,8 @@ function Graphics3D(canvas) {
     color: []
   };
 
+  this.renderTarget = null;
+
 
   this.onrender = function () {};
 }
@@ -30,6 +32,10 @@ Graphics3D.prototype.clear = function () {
 
 Graphics3D.prototype.setClearColor = function (r, g, b, a) {
     this.gl.clearColor(r, g, b, a);
+};
+
+Graphics3D.prototype.setRenderTarget = function (renderTarget) {
+  this.renderTarget = renderTarget;
 };
 
 Graphics3D.prototype.loadShader = function (type, source) {
@@ -121,6 +127,14 @@ let then = 0;
 Graphics3D.prototype.drawScene = function (programInfo, deltaTime) {
   const gl = this.gl;
   if (!gl) return;
+
+  if (this.renderTarget) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.renderTarget.framebuffer);
+    gl.viewport(0, 0, this.renderTarget.width, this.renderTarget.height);
+  } else {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+  }
 
   gl.clearDepth(1.0); // Clear everything
   gl.enable(gl.DEPTH_TEST); // Enable depth testing
