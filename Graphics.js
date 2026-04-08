@@ -20,26 +20,6 @@ function Graphics3D(canvas) {
     color: []
   };
 
-  this.programInfo = {
-  program: this.shaderProgram,
-  attribLocations: {
-    vertexPosition: this.gl.getAttribLocation(
-      this.shaderProgram,
-      "aVertexPosition"
-    ),
-    vertexColor: this.gl.getAttribLocation(this.shaderProgram, "aVertexColor")
-  },
-  uniformLocations: {
-    projectionMatrix: this.gl.getUniformLocation(
-      this.shaderProgram,
-      "uProjectionMatrix"
-    ),
-    modelViewMatrix: this.gl.getUniformLocation(
-      this.shaderProgram,
-      "uModelViewMatrix"
-    )
-  }
-};
 
   this.onrender = function () {};
 }
@@ -105,6 +85,28 @@ Graphics3D.prototype.loadShaders = function (vsSource, fsSource) {
   const positions = [1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, -1.0];
 
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+  
+  this.programInfo = {
+  program: this.shaderProgram,
+  attribLocations: {
+    vertexPosition: this.gl.getAttribLocation(
+      this.shaderProgram,
+      "aVertexPosition"
+    ),
+    vertexColor: this.gl.getAttribLocation(this.shaderProgram, "aVertexColor")
+  },
+  uniformLocations: {
+    projectionMatrix: this.gl.getUniformLocation(
+      this.shaderProgram,
+      "uProjectionMatrix"
+    ),
+    modelViewMatrix: this.gl.getUniformLocation(
+      this.shaderProgram,
+      "uModelViewMatrix"
+    )
+  }
+};
 };
 
 let squareRotation = 0.0;
