@@ -48,11 +48,11 @@ void main() {
     // 4. Sample the pattern using the final X we landed on
     // Normalize X by tileWidth so the pattern repeats properly
     vec2 patternUV = vec2(currX / tileWidth, y / iResolution.y);
-    //gl_FragColor = texture2D(pattern, patternUV);
     /// I hope yo
     gl_FragColor = vec4(vec3(random(patternUV)), 1); 
+    gl_FragColor = texture2D(pattern, patternUV);
     // if (deep) gl_FragColor *= vec4(1,0,0,1);
-    if (patternUV.x < 0.1) if (random(patternUV) > 0.9) {
+    if (patternUV.x < 0.1) if (!(random(patternUV) > 0.5)) {
         gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
     }
 }
