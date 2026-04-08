@@ -24,7 +24,7 @@ void main() {
     float currX = gl_FragCoord.x;
     float y = gl_FragCoord.y;
 
-    bool deep = false;
+    bool deep = texture2D(depthBuffer, gl_FragCoord.xy).x > 0.01;
 
     // 3. The Stereogram Trace-Back Loop
     // We look to the left repeatedly, shifting slightly based on depth.
@@ -35,7 +35,7 @@ void main() {
         vec2 depthUV = vec2(currX, y) / iResolution.xy;
         float depth = texture2D(depthBuffer, depthUV).r;
 
-        if (depth > 0.01) deep = true;
+        // if (depth > 0.01) deep = true;
         
         // Shift jump: standard width minus the depth-based "pinch"
         currX -= (tileWidth - depth * maxDepthShift);
@@ -59,16 +59,14 @@ function init() {
     const depthImage = document.getElementById("depth-image");
 
     /**
-     * 
      * @param {number} type 
      * @param {string} shaderSource 
-     * @returns 
      */
     function createShader(type, shaderSource) {
         if (!gl) throw new Error("No GL");
 
         const s = gl.createShader(type);
-        if (!s) throw new Error("No GL");
+        if (!s) throw new Error("No shader");
         gl.shaderSource(s, shaderSource);
         gl.compileShader(s);
 
@@ -140,3 +138,5 @@ function init() {
 }
 
 init();
+
+
