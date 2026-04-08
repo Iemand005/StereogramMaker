@@ -11,8 +11,8 @@ void main() {
 const fragShader = `
 precision highp float;
 uniform vec2 iResolution;
-uniform sampler2D iChannel0;
-uniform sampler2D iChannel1;
+uniform sampler2D pattern;
+uniform sampler2D depthBuffer;
 varying vec2 vUv;
 
 void main() {
@@ -24,6 +24,8 @@ void main() {
     float currX = gl_FragCoord.x;
     float y = gl_FragCoord.y;
 
+    bool deep = false;
+
     // 3. The Stereogram Trace-Back Loop
     // We look to the left repeatedly, shifting slightly based on depth.
     for (int i = 0; i < 30; i++) {
@@ -31,7 +33,9 @@ void main() {
         
         // IMPORTANT: Normalize coordinates to [0,1] for texture2D
         vec2 depthUV = vec2(currX, y) / iResolution.xy;
-        float depth = texture2D(iChannel1, depthUV).r;
+        float depth = texture2D(depthBuffer, depthUV).r;
+
+        if (depth > 0.01) deep = true;
         
         // Shift jump: standard width minus the depth-based "pinch"
         currX -= (tileWidth - depth * maxDepthShift);
@@ -40,7 +44,8 @@ void main() {
     // 4. Sample the pattern using the final X we landed on
     // Normalize X by tileWidth so the pattern repeats properly
     vec2 patternUV = vec2(currX / tileWidth, y / iResolution.y);
-    gl_FragColor = texture2D(iChannel0, patternUV);
+    gl_FragColor = texture2D(pattern, patternUV);
+    if (deep) gl_FragColor *= vec4(1,0,0,1);
 }
 `;
 
@@ -103,8 +108,8 @@ function loadTexture(img, index) {
     return tex;
 }
 
-gl.uniform1i(gl.getUniformLocation(program, "iChannel0"), 0);
-gl.uniform1i(gl.getUniformLocation(program, "iChannel1"), 1);
+gl.uniform1i(gl.getUniformLocation(program, "pattern"), 0);
+gl.uniform1i(gl.getUniformLocation(program, "depthBuffer"), 1);
 
 loadTexture(patternImage, 0);
 loadTexture(depthImage, 1);
