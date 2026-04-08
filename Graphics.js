@@ -356,7 +356,7 @@ Graphics3D.prototype.startRendering = function () {
 };
 
 Graphics3D.prototype.resize = function (width, height) {
-  return;
+  // return;
   const dpr = window.devicePixelRatio || 1;
   this.canvas.width = width * dpr;
   this.canvas.height = height * dpr;

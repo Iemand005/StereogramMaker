@@ -17,7 +17,10 @@ uniform float frameSeed;
 varying vec2 vUv;
 
 float random(vec2 st) {
-    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+    // Hash-based random with fewer visible bands than sin(dot()) noise.
+    vec3 p3 = fract(vec3(st.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
 }
 
 void main() {
@@ -54,10 +57,9 @@ void main() {
         float brightness = (anchorNoise > 0.8) ? 1.0 : 0.0;
         gl_FragColor = vec4(vec3(brightness), 1.0);
     } else {
-        // Procedural strip pattern that changes every frame.
-        float stripX = floor(patternUV.x * 256.0);
-        float stripY = floor(patternUV.y * 64.0);
-        float noise = random(vec2(stripX + frameSeed * 17.0, stripY + frameSeed * 31.0));
+        // Procedural noise pattern that changes every frame.
+        vec2 cell = floor(patternUV * vec2(256.0, 128.0));
+        float noise = random(cell + frameSeed * vec2(17.0, 31.0));
         gl_FragColor = vec4(vec3(noise), 1.0);
     }
 }
