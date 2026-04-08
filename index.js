@@ -127,7 +127,7 @@ function init() {
     gl.uniform1i(gl.getUniformLocation(program, "pattern"), 0);
     gl.uniform1i(gl.getUniformLocation(program, "depthBuffer"), 1);
 
-    if (!patternImage || !depthImage) return;
+    if (!(patternImage instanceof HTMLImageElement && depthImage instanceof HTMLImageElement)) return;
     loadTexture(patternImage, 0);
     loadTexture(depthImage, 1);
 
