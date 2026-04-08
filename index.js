@@ -34,7 +34,8 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // Get depth value for pixel
     float depth = texture(iChannel1, uv).r;
     
-    while (currX > tileWidth) {
+    // while (currX > tileWidth) {
+    for (int i = 0; i < 30; i++) {
         // Get depth at the current spot (0.0 to 1.0)
         float depth = texture(iChannel1, vec2(currX, y) / iResolution.xy).r;
         
@@ -66,12 +67,20 @@ function createShader(gl, type, source) {
     const s = gl.createShader(type);
     gl.shaderSource(s, source);
     gl.compileShader(s);
+
+if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        const msg = gl.getShaderInfoLog(s);
+        console.error(msg);
+        alert("Shader Error: " + msg);
+        return null;
+    }
+
     return s;
 }
 
 const program = gl.createProgram();
-gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vertSource));
-gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fragSource));
+gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vertShader));
+gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fragShader));
 gl.linkProgram(program);
 gl.useProgram(program);
 
@@ -116,8 +125,8 @@ gl.uniform1i(gl.getUniformLocation(program, "iChannel0"), 0);
 gl.uniform1i(gl.getUniformLocation(program, "iChannel1"), 1);
 
 // Load your local images here
-loadTexture('pattern.jpg', 0); 
-loadTexture('shark_depth.jpg', 1);
+loadTexture('image.png', 0); 
+loadTexture('shark.png', 1);
 
 function draw() {
     gl.clear(gl.COLOR_BUFFER_BIT);
