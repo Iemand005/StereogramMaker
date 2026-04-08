@@ -44,9 +44,12 @@ void main() {
 }
 `;
 
-/** @type {HTMLCanvasElement} */
+/** @type {HTMLCanvasElement?} */
 const canvas = document.getElementById('autostereogram');
 const gl = canvas.getContext('webgl');
+
+const patternImage = document.getElementById("pattern-image");
+const depthImage = document.getElementById("depth-image");
 
 function createShader(gl, type, source) {
     const s = gl.createShader(type);
@@ -80,7 +83,7 @@ gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 const resLoc = gl.getUniformLocation(program, "iResolution");
 gl.uniform2f(resLoc, canvas.width, canvas.height);
 
-function loadTexture(url, index) {
+function loadTexture(img, index) {
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); 
     const tex = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0 + index);
@@ -90,24 +93,21 @@ function loadTexture(url, index) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
 
-    const img = new Image();
     img.onload = function() {
         gl.activeTexture(gl.TEXTURE0 + index);
         gl.bindTexture(gl.TEXTURE_2D, tex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
         draw();
     };
-    img.crossOrigin = "anonymous";
-    img.src = url;
-    document.body.appendChild(img);
+    
     return tex;
 }
 
 gl.uniform1i(gl.getUniformLocation(program, "iChannel0"), 0);
 gl.uniform1i(gl.getUniformLocation(program, "iChannel1"), 1);
 
-loadTexture('image.png', 0); 
-loadTexture('shark.png', 1);
+loadTexture(patternImage, 0);
+loadTexture(depthImage, 1);
 
 function draw() {
     gl.clear(gl.COLOR_BUFFER_BIT);
