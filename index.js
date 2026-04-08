@@ -74,3 +74,52 @@ gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vertSource));
 gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fragSource));
 gl.linkProgram(program);
 gl.useProgram(program);
+
+// Create a Square (Full-screen Quad)
+const buffer = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+
+const posLoc = gl.getAttribLocation(program, "position");
+gl.enableVertexAttribArray(posLoc);
+gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+
+// Set Resolution Uniform
+const resLoc = gl.getUniformLocation(program, "iResolution");
+gl.uniform2f(resLoc, canvas.width, canvas.height);
+
+// --- TEXTURE LOADING HELPER ---
+function loadTexture(url, index) {
+    const tex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0 + index);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    
+    // Set wrapping to REPEAT so the pattern tiles
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+    const img = new Image();
+    img.onload = () => {
+        gl.activeTexture(gl.TEXTURE0 + index);
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+        draw(); // Draw once the image is ready
+    };
+    img.crossOrigin = "anonymous";
+    img.src = url;
+    return tex;
+}
+
+// Set Texture Uniforms
+gl.uniform1i(gl.getUniformLocation(program, "iChannel0"), 0);
+gl.uniform1i(gl.getUniformLocation(program, "iChannel1"), 1);
+
+// Load your local images here
+loadTexture('pattern.jpg', 0); 
+loadTexture('shark_depth.jpg', 1);
+
+function draw() {
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+}
