@@ -159,16 +159,9 @@ if (canvas instanceof HTMLCanvasElement) {
     precision mediump float;
     varying highp float vDepth;
     void main() {
-        // Use model-view depth so the faces separate clearly instead of collapsing into one hue.
+        // Pure grayscale depth gradient from black to white.
         float depth = smoothstep(4.0, 8.0, vDepth);
-
-        vec3 nearColor = vec3(1.0, 0.98, 0.92);
-        vec3 midColor = vec3(0.96, 0.70, 0.34);
-        vec3 farColor = vec3(0.14, 0.16, 0.20);
-        vec3 color = mix(nearColor, midColor, smoothstep(0.0, 0.55, depth));
-        color = mix(color, farColor, smoothstep(0.55, 1.0, depth) * 0.65);
-
-        gl_FragColor = vec4(color, 1.0);
+        gl_FragColor = vec4(vec3(depth), 1.0);
     }
 `;
 
