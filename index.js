@@ -158,8 +158,10 @@ if (canvas instanceof HTMLCanvasElement) {
     const fsSourceColour =
     "varying lowp vec4 vColor; void main() { gl_FragColor = vColor; }";
     const fsSource = `
-    precision lowp float;
+    precision mediump float;
     void main() {
+        // gl_FragCoord.z goes from 0.0 (near) to 1.0 (far)
+        // We invert it so the closest parts are WHITE and far is BLACK
         float depth = 1.0 - gl_FragCoord.z;
         gl_FragColor = vec4(vec3(depth), 1.0);
     }
