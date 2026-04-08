@@ -16,7 +16,6 @@ uniform sampler2D iChannel1;
 varying vec2 vUv;
 
 void main() {
-    // 1. Settings
     float numTiles = 6.0;
     float maxDepthShift = 20.0; // Adjust this for more/less 3D pop
     float tileWidth = iResolution.x / numTiles;
