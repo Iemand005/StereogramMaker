@@ -56,11 +56,52 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // fragColor
 }
 
+// void main() {
+//     // mainImage(gl_FragColor, gl_FragCoord.xy);
+//     // vec4 col = texture2D(iChannel0, vUv);
+
+
+//     for (int i = 0; i < 30; i++) {
+//         // Get depth at the current spot (0.0 to 1.0)
+//         float depth = texture2D(iChannel1, vec2(currX, y) / iResolution.xy).r;
+        
+//         // Subtract the tile width, but shift it slightly based on depth
+//         // More depth (whiter) = smaller jump = pixels look "closer"
+//         currX -= (tileWidth - depth * maxDepthShift);
+//     }
+    
+
+//     gl_FragColor = col;
+//     // gl_FragColor = texture2D(iChannel0, vUv);
+// }
+
 void main() {
-    // mainImage(gl_FragColor, gl_FragCoord.xy);
-    // vec4 col = texture2D(iChannel0, vUv);
-    // gl_FragColor = col;
-    gl_FragColor = texture2D(iChannel0, vUv);
+    // 1. Settings
+    float numTiles = 6.0; 
+    float maxDepthShift = 20.0; // Adjust this for more/less 3D pop
+    float tileWidth = iResolution.x / numTiles;
+    
+    // 2. Current pixel in raw coordinates
+    float currX = gl_FragCoord.x;
+    float y = gl_FragCoord.y;
+
+    // 3. The Stereogram Trace-Back Loop
+    // We look to the left repeatedly, shifting slightly based on depth.
+    for (int i = 0; i < 30; i++) {
+        if (currX < tileWidth) break;
+        
+        // IMPORTANT: Normalize coordinates to [0,1] for texture2D
+        vec2 depthUV = vec2(currX, y) / iResolution.xy;
+        float depth = texture2D(iChannel1, depthUV).r;
+        
+        // Shift jump: standard width minus the depth-based "pinch"
+        currX -= (tileWidth - depth * maxDepthShift);
+    }
+    
+    // 4. Sample the pattern using the final X we landed on
+    // Normalize X by tileWidth so the pattern repeats properly
+    vec2 patternUV = vec2(currX / tileWidth, y / iResolution.y);
+    gl_FragColor = texture2D(iChannel0, patternUV);
 }
 `;
 
@@ -103,6 +144,7 @@ gl.uniform2f(resLoc, canvas.width, canvas.height);
 
 // --- TEXTURE LOADING HELPER ---
 function loadTexture(url, index) {
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); 
     const tex = gl.createTexture();
     gl.activeTexture(gl.TEXTURE0 + index);
     gl.bindTexture(gl.TEXTURE_2D, tex);
