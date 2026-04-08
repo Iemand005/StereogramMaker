@@ -213,16 +213,18 @@ Graphics3D.prototype.drawScene = function (programInfo, deltaTime) {
   const normalize = false;
   const stride = 0;
   const offset = 0;
-  gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.color);
-  gl.vertexAttribPointer(
-    this.programInfo.attribLocations.vertexColor,
-    numComponents,
-    type,
-    normalize,
-    stride,
-    offset
-  );
-  gl.enableVertexAttribArray(this.programInfo.attribLocations.vertexColor);
+  if (this.programInfo.attribLocations.vertexColor !== -1) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.color);
+    gl.vertexAttribPointer(
+      this.programInfo.attribLocations.vertexColor,
+      numComponents,
+      type,
+      normalize,
+      stride,
+      offset
+    );
+    gl.enableVertexAttribArray(this.programInfo.attribLocations.vertexColor);
+  }
 
   // Tell WebGL to use our program when drawing
   gl.useProgram(this.programInfo.program);
