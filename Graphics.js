@@ -28,6 +28,10 @@ Graphics3D.prototype.clear = function () {
   this.gl.clear(this.gl.COLOR_BUFFER_BIT);
 };
 
+Graphics3D.prototype.setClearColor = function (r, g, b, a) {
+    this.gl.clearColor(r, g, b, a);
+};
+
 Graphics3D.prototype.loadShader = function (type, source) {
   const shader = this.gl.createShader(type);
   this.gl.shaderSource(shader, source);

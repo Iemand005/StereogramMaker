@@ -159,14 +159,15 @@ if (canvas instanceof HTMLCanvasElement) {
     precision mediump float;
     varying highp float vDepth;
     void main() {
-        // Pure grayscale depth gradient from black to white.
-        float depth = smoothstep(4.0, 8.0, vDepth);
+        // Pure grayscale depth gradient, flipped so the foreground is white.
+        float depth = 1.0 - smoothstep(4.0, 8.0, vDepth);
         gl_FragColor = vec4(vec3(depth), 1.0);
     }
 `;
 
     const graphics = new Graphics3D(canvas);
     const gl = graphics.gl;
+    graphics.setClearColor(0, 0, 0, 1);
     graphics.clear();
     graphics.loadShaders(vsSource, fsSource);
 
