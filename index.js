@@ -154,21 +154,19 @@ init();
 const canvas = document.getElementById("canvas");
 if (canvas instanceof HTMLCanvasElement) {
     const vsSource =
-    "attribute vec4 aVertexPosition; attribute vec4 aVertexColor; uniform mat4 uModelViewMatrix; uniform mat4 uProjectionMatrix; varying lowp vec4 vColor; void main() { gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition; vColor = aVertexColor; }";
-    const fsSourceColour =
-    "varying lowp vec4 vColor; void main() { gl_FragColor = vColor; }";
+    "attribute vec4 aVertexPosition; attribute vec4 aVertexColor; uniform mat4 uModelViewMatrix; uniform mat4 uProjectionMatrix; varying highp float vDepth; void main() { vec4 mvPosition = uModelViewMatrix * aVertexPosition; vDepth = -mvPosition.z; gl_Position = uProjectionMatrix * mvPosition; }";
     const fsSource = `
     precision mediump float;
+    varying highp float vDepth;
     void main() {
-        // Depth is non-linear in screen space, so boost the contrast before coloring.
-        float depth = 1.0 - gl_FragCoord.z;
-        depth = pow(clamp(depth, 0.0, 1.0), 0.35);
+        // Use model-view depth so the faces separate clearly instead of collapsing into one hue.
+        float depth = smoothstep(4.0, 8.0, vDepth);
 
-        vec3 nearColor = vec3(1.0, 0.95, 0.90);
-        vec3 midColor = vec3(0.95, 0.55, 0.25);
-        vec3 farColor = vec3(0.20, 0.35, 0.95);
-        vec3 color = mix(farColor, midColor, smoothstep(0.15, 0.65, depth));
-        color = mix(color, nearColor, smoothstep(0.65, 0.98, depth));
+        vec3 nearColor = vec3(1.0, 0.98, 0.92);
+        vec3 midColor = vec3(0.96, 0.70, 0.34);
+        vec3 farColor = vec3(0.14, 0.16, 0.20);
+        vec3 color = mix(nearColor, midColor, smoothstep(0.0, 0.55, depth));
+        color = mix(color, farColor, smoothstep(0.55, 1.0, depth) * 0.65);
 
         gl_FragColor = vec4(color, 1.0);
     }
