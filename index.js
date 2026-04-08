@@ -136,6 +136,13 @@ function init() {
 
     uploadDepthFrame = function (pixels, width, height) {
         ensureDepthTexture();
+        const flipped = new Uint8Array(pixels.length);
+        const rowSize = width * 4;
+        for (let y = 0; y < height; y++) {
+            const srcStart = y * rowSize;
+            const dstStart = (height - 1 - y) * rowSize;
+            flipped.set(pixels.subarray(srcStart, srcStart + rowSize), dstStart);
+        }
         gl.activeTexture(gl.TEXTURE1);
         gl.bindTexture(gl.TEXTURE_2D, depthTexture);
         gl.texImage2D(
@@ -147,7 +154,7 @@ function init() {
             0,
             gl.RGBA,
             gl.UNSIGNED_BYTE,
-            pixels
+            flipped
         );
         draw();
     };
