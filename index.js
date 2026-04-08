@@ -49,72 +49,81 @@ void main() {
 }
 `;
 
-/** @type {HTMLCanvasElement?} */
-const canvas = document.getElementById('autostereogram');
-const gl = canvas.getContext('webgl');
+function init() {
+    const canvas = document.getElementById('autostereogram');
+    if (!(canvas instanceof HTMLCanvasElement)) return;
+    const gl = canvas.getContext('webgl');
+    if (!gl) return;
 
-const patternImage = document.getElementById("pattern-image");
-const depthImage = document.getElementById("depth-image");
+    const patternImage = document.getElementById("pattern-image");
+    const depthImage = document.getElementById("depth-image");
 
-function createShader(gl, type, source) {
-    const s = gl.createShader(type);
-    gl.shaderSource(s, source);
-    gl.compileShader(s);
+    function createShader(type, source) {
+        if (!gl) return;
 
-if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-        const msg = gl.getShaderInfoLog(s);
-        console.error(msg);
-        alert("Shader Error: " + msg);
-        return null;
+        const s = gl.createShader(type);
+        if (!s) return;
+        gl.shaderSource(s, source);
+        gl.compileShader(s);
+
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+            const msg = gl.getShaderInfoLog(s);
+            console.error(msg);
+            alert("Shader Error: " + msg);
+            return null;
+        }
+
+        return s;
     }
 
-    return s;
-}
+    const program = gl.createProgram();
+    gl.attachShader(program, createShader(gl.VERTEX_SHADER, vertShader));
+    gl.attachShader(program, createShader(gl.FRAGMENT_SHADER, fragShader));
+    gl.linkProgram(program);
+    gl.useProgram(program);
 
-const program = gl.createProgram();
-gl.attachShader(program, createShader(gl, gl.VERTEX_SHADER, vertShader));
-gl.attachShader(program, createShader(gl, gl.FRAGMENT_SHADER, fragShader));
-gl.linkProgram(program);
-gl.useProgram(program);
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
 
-const buffer = gl.createBuffer();
-gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+    const posLoc = gl.getAttribLocation(program, "position");
+    gl.enableVertexAttribArray(posLoc);
+    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 
-const posLoc = gl.getAttribLocation(program, "position");
-gl.enableVertexAttribArray(posLoc);
-gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+    const resLoc = gl.getUniformLocation(program, "iResolution");
+    gl.uniform2f(resLoc, canvas.width, canvas.height);
 
-const resLoc = gl.getUniformLocation(program, "iResolution");
-gl.uniform2f(resLoc, canvas.width, canvas.height);
-
-function loadTexture(img, index) {
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); 
-    const tex = gl.createTexture();
-    gl.activeTexture(gl.TEXTURE0 + index);
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-    img.onload = function() {
+    function loadTexture(img, index) {
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); 
+        const tex = gl.createTexture();
         gl.activeTexture(gl.TEXTURE0 + index);
         gl.bindTexture(gl.TEXTURE_2D, tex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-        draw();
-    };
-    
-    return tex;
+        
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+
+        img.onload = function() {
+            gl.activeTexture(gl.TEXTURE0 + index);
+            gl.bindTexture(gl.TEXTURE_2D, tex);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+            draw();
+        };
+        
+        return tex;
+    }
+
+    gl.uniform1i(gl.getUniformLocation(program, "pattern"), 0);
+    gl.uniform1i(gl.getUniformLocation(program, "depthBuffer"), 1);
+
+    loadTexture(patternImage, 0);
+    loadTexture(depthImage, 1);
+
+    function draw() {
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+
 }
 
-gl.uniform1i(gl.getUniformLocation(program, "pattern"), 0);
-gl.uniform1i(gl.getUniformLocation(program, "depthBuffer"), 1);
-
-loadTexture(patternImage, 0);
-loadTexture(depthImage, 1);
-
-function draw() {
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-}
+init();
