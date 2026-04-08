@@ -315,6 +315,20 @@ Graphics3D.prototype.drawScene = function (programInfo, deltaTime) {
     gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
   }
 
+  if (this.renderTarget && typeof uploadDepthFrame === "function") {
+    const pixels = new Uint8Array(this.renderTarget.width * this.renderTarget.height * 4);
+    gl.readPixels(
+      0,
+      0,
+      this.renderTarget.width,
+      this.renderTarget.height,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      pixels
+    );
+    uploadDepthFrame(pixels, this.renderTarget.width, this.renderTarget.height);
+  }
+
   if (this.renderTarget) {
     this.presentRenderTarget();
   }

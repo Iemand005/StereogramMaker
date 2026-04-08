@@ -59,6 +59,8 @@ void main() {
 }
 `;
 
+let uploadDepthFrame = null;
+
 function init() {
     const canvas = document.getElementById('autostereogram');
     if (!(canvas instanceof HTMLCanvasElement)) return;
@@ -66,7 +68,6 @@ function init() {
     if (!gl) return;
 
     const patternImage = document.getElementById("pattern-image");
-    const depthImage = document.getElementById("depth-image");
 
     /**
      * @param {number} type 
@@ -107,10 +108,50 @@ function init() {
     const resLoc = gl.getUniformLocation(program, "iResolution");
     gl.uniform2f(resLoc, canvas.width, canvas.height);
 
-    /**
-     * @param {HTMLImageElement} img 
-     * @param {number} index 
-     */
+    let depthTexture = null;
+
+    function ensureDepthTexture() {
+        if (depthTexture) return depthTexture;
+        depthTexture = gl.createTexture();
+        if (!depthTexture) throw new Error("Unable to create depth texture");
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, depthTexture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            canvas.width,
+            canvas.height,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            null
+        );
+        return depthTexture;
+    }
+
+    uploadDepthFrame = function (pixels, width, height) {
+        ensureDepthTexture();
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, depthTexture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            width,
+            height,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            pixels
+        );
+        draw();
+    };
+
     function loadTexture(img, index) {
         if (!gl) return;
         gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); 
@@ -135,9 +176,9 @@ function init() {
     gl.uniform1i(gl.getUniformLocation(program, "pattern"), 0);
     gl.uniform1i(gl.getUniformLocation(program, "depthBuffer"), 1);
 
-    if (!(patternImage instanceof HTMLImageElement && depthImage instanceof HTMLImageElement)) return;
+    if (!(patternImage instanceof HTMLImageElement)) return;
     loadTexture(patternImage, 0);
-    loadTexture(depthImage, 1);
+    ensureDepthTexture();
 
     function draw() {
         if (!gl) return;
