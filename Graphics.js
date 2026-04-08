@@ -21,6 +21,10 @@ function Graphics3D(canvas) {
   };
 
   this.renderTarget = null;
+  this.blitProgram = null;
+  this.blitBuffer = null;
+  this.blitAttribLocation = -1;
+  this.blitTextureLocation = null;
 
 
   this.onrender = function () {};
@@ -36,6 +40,65 @@ Graphics3D.prototype.setClearColor = function (r, g, b, a) {
 
 Graphics3D.prototype.setRenderTarget = function (renderTarget) {
   this.renderTarget = renderTarget;
+};
+
+Graphics3D.prototype.initBlitResources = function () {
+  if (this.blitProgram) return;
+
+  const gl = this.gl;
+  const vsSource =
+    "attribute vec2 aPosition; varying vec2 vUv; void main() { vUv = aPosition * 0.5 + 0.5; gl_Position = vec4(aPosition, 0.0, 1.0); }";
+  const fsSource =
+    "precision mediump float; uniform sampler2D uTexture; varying vec2 vUv; void main() { gl_FragColor = texture2D(uTexture, vUv); }";
+
+  const vertexShader = this.loadShader(gl.VERTEX_SHADER, vsSource);
+  const fragmentShader = this.loadShader(gl.FRAGMENT_SHADER, fsSource);
+  const program = gl.createProgram();
+  gl.attachShader(program, vertexShader);
+  gl.attachShader(program, fragmentShader);
+  gl.linkProgram(program);
+
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    alert(
+      "Unable to initialize the blit shader program: " +
+        gl.getProgramInfoLog(program)
+    );
+    return;
+  }
+
+  this.blitProgram = program;
+  this.blitAttribLocation = gl.getAttribLocation(program, "aPosition");
+  this.blitTextureLocation = gl.getUniformLocation(program, "uTexture");
+
+  this.blitBuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, this.blitBuffer);
+  gl.bufferData(
+    gl.ARRAY_BUFFER,
+    new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+    gl.STATIC_DRAW
+  );
+};
+
+Graphics3D.prototype.presentRenderTarget = function () {
+  const gl = this.gl;
+  if (!this.renderTarget) return;
+  if (!this.blitProgram) this.initBlitResources();
+  if (!this.blitProgram || this.blitAttribLocation === -1) return;
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+  gl.disable(gl.DEPTH_TEST);
+  gl.useProgram(this.blitProgram);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, this.blitBuffer);
+  gl.vertexAttribPointer(this.blitAttribLocation, 2, gl.FLOAT, false, 0, 0);
+  gl.enableVertexAttribArray(this.blitAttribLocation);
+
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, this.renderTarget.colorTexture);
+  gl.uniform1i(this.blitTextureLocation, 0);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
 };
 
 Graphics3D.prototype.loadShader = function (type, source) {
@@ -250,6 +313,10 @@ Graphics3D.prototype.drawScene = function (programInfo, deltaTime) {
     const type = gl.UNSIGNED_SHORT;
     const offset = 0;
     gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+  }
+
+  if (this.renderTarget) {
+    this.presentRenderTarget();
   }
 };
 
