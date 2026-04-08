@@ -58,19 +58,25 @@ function init() {
     const patternImage = document.getElementById("pattern-image");
     const depthImage = document.getElementById("depth-image");
 
-    function createShader(type, source) {
-        if (!gl) return;
+    /**
+     * 
+     * @param {number} type 
+     * @param {string} shaderSource 
+     * @returns 
+     */
+    function createShader(type, shaderSource) {
+        if (!gl) throw new Error("No GL");
 
         const s = gl.createShader(type);
-        if (!s) return;
-        gl.shaderSource(s, source);
+        if (!s) throw new Error("No GL");
+        gl.shaderSource(s, shaderSource);
         gl.compileShader(s);
 
         if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
             const msg = gl.getShaderInfoLog(s);
             console.error(msg);
             alert("Shader Error: " + msg);
-            return null;
+            throw new Error(msg || "Unknown error");
         }
 
         return s;
@@ -93,8 +99,13 @@ function init() {
     const resLoc = gl.getUniformLocation(program, "iResolution");
     gl.uniform2f(resLoc, canvas.width, canvas.height);
 
+    /**
+     * @param {HTMLImageElement} img 
+     * @param {number} index 
+     */
     function loadTexture(img, index) {
-    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); 
+        if (!gl) return;
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); 
         const tex = gl.createTexture();
         gl.activeTexture(gl.TEXTURE0 + index);
         gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -116,10 +127,12 @@ function init() {
     gl.uniform1i(gl.getUniformLocation(program, "pattern"), 0);
     gl.uniform1i(gl.getUniformLocation(program, "depthBuffer"), 1);
 
+    if (!patternImage || !depthImage) return;
     loadTexture(patternImage, 0);
     loadTexture(depthImage, 1);
 
     function draw() {
+        if (!gl) return;
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
