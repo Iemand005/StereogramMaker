@@ -59,7 +59,7 @@ void main() {
 `;
 
 /** @type {HTMLCanvasElement} */
-const canvas = document.getElementById('glCanvas');
+const canvas = document.getElementById('autostereogram');
 const gl = canvas.getContext('webgl');
 
 function createShader(gl, type, source) {
