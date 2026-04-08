@@ -160,10 +160,16 @@ if (canvas instanceof HTMLCanvasElement) {
     const fsSource = `
     precision mediump float;
     void main() {
-        // gl_FragCoord.z goes from 0.0 (near) to 1.0 (far)
-        // We invert it so the closest parts are WHITE and far is BLACK
+        // gl_FragCoord.z is non-linear, so remap it to a stronger visible range.
+        // Near fragments become warm/brighter, far fragments fade to cooler/darker tones.
         float depth = 1.0 - gl_FragCoord.z;
-        gl_FragColor = vec4(vec3(depth), 1.0);
+        depth = smoothstep(0.0, 0.18, depth);
+
+        vec3 nearColor = vec3(1.0, 0.95, 0.65);
+        vec3 farColor = vec3(0.05, 0.25, 0.75);
+        vec3 color = mix(farColor, nearColor, depth);
+
+        gl_FragColor = vec4(color, 1.0);
     }
 `;
 
