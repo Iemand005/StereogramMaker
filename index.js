@@ -51,7 +51,10 @@ void main() {
     //gl_FragColor = texture2D(pattern, patternUV);
     /// I hope yo
     gl_FragColor = vec4(vec3(random(patternUV)), 1); 
-    if (deep) gl_FragColor *= vec4(1,0,0,1);
+    // if (deep) gl_FragColor *= vec4(1,0,0,1);
+    if (patternUV.x < 0.1) if (random(patternUV) > 0.9) {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    }
 }
 `;
 
