@@ -3,11 +3,7 @@ attribute vec3 position; // The x,y,z coordinates of our rectangle corners
 varying vec2 vUv;        // This passes the coordinates to the Pixel Shader
 
 void main() {
-    // 1. Pass the position to the fragment shader as a UV (0 to 1)
-    // Most full-screen quads go from -1 to 1, so we map that to 0 to 1
     vUv = position.xy * 0.5 + 0.5;
-
-    // 2. Tell the GPU where the vertex is in 3D space
     gl_Position = vec4(position, 1.0);
 }
 `;
