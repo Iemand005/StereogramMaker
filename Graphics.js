@@ -1,5 +1,54 @@
 
-Graphics.prototype.loadShader = function (type, source) {
+/**
+ * @param {HTMLCanvasElement} canvas
+ */
+function Graphics3D(canvas) {
+  /* @type {HTMLCanvasElement} */
+  this.canvas = canvas;
+  this.gl = canvas.getContext("webgl");
+  this.ie11 = false;
+  if (!this.gl) {
+    this.gl = canvas.getContext("experimental-webgl");
+    if (this.gl) this.ie11 = true;
+  }
+
+  this.gl.clearColor(0, 0, 0, 0);
+
+  this.buffers = {
+    position: [],
+    indices: [],
+    color: []
+  };
+
+  this.programInfo = {
+  program: this.shaderProgram,
+  attribLocations: {
+    vertexPosition: this.gl.getAttribLocation(
+      this.shaderProgram,
+      "aVertexPosition"
+    ),
+    vertexColor: this.gl.getAttribLocation(this.shaderProgram, "aVertexColor")
+  },
+  uniformLocations: {
+    projectionMatrix: this.gl.getUniformLocation(
+      this.shaderProgram,
+      "uProjectionMatrix"
+    ),
+    modelViewMatrix: this.gl.getUniformLocation(
+      this.shaderProgram,
+      "uModelViewMatrix"
+    )
+  }
+};
+
+  this.onrender = function () {};
+}
+
+Graphics3D.prototype.clear = function () {
+  this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+};
+
+Graphics3D.prototype.loadShader = function (type, source) {
   const shader = this.gl.createShader(type);
   this.gl.shaderSource(shader, source);
   this.gl.compileShader(shader);
@@ -18,7 +67,7 @@ Graphics.prototype.loadShader = function (type, source) {
   return shader;
 };
 
-Graphics.prototype.initShaderProgram = function (vsSource, fsSource) {
+Graphics3D.prototype.initShaderProgram = function (vsSource, fsSource) {
   const vertexShader = this.loadShader(this.gl.VERTEX_SHADER, vsSource);
   const fragmentShader = this.loadShader(this.gl.FRAGMENT_SHADER, fsSource);
 
@@ -42,35 +91,7 @@ Graphics.prototype.initShaderProgram = function (vsSource, fsSource) {
   return shaderProgram;
 };
 
-/**
- * @param {HTMLCanvasElement} canvas
- */
-function Graphics(canvas) {
-  /* @type {HTMLCanvasElement} */
-  this.canvas = canvas;
-  this.gl = canvas.getContext("webgl");
-  this.ie11 = false;
-  if (!this.gl) {
-    this.gl = canvas.getContext("experimental-webgl");
-    if (this.gl) this.ie11 = true;
-  }
-
-  this.gl.clearColor(0, 0, 0, 0);
-
-  this.buffers = {
-    position: [],
-    indices: [],
-    color: []
-  };
-
-  this.onrender = function () {};
-}
-
-Graphics.prototype.clear = function () {
-  this.gl.clear(this.gl.COLOR_BUFFER_BIT);
-};
-
-Graphics.prototype.loadShaders = function (vsSource, fsSource) {
+Graphics3D.prototype.loadShaders = function (vsSource, fsSource) {
   const gl = this.gl;
   this.shaderProgram = this.initShaderProgram(vsSource, fsSource);
 
@@ -91,7 +112,7 @@ let deltaTime = 0;
 // let now = 0;
 let then = 0;
 
-Graphics.prototype.drawScene = function (programInfo, deltaTime) {
+Graphics3D.prototype.drawScene = function (programInfo, deltaTime) {
   const gl = this.gl;
 
   gl.clearDepth(1.0); // Clear everything
@@ -155,14 +176,14 @@ Graphics.prototype.drawScene = function (programInfo, deltaTime) {
     if (!this.buffers) return;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.position);
     gl.vertexAttribPointer(
-      programInfo.attribLocations.vertexPosition,
+      this.programInfo.attribLocations.vertexPosition,
       numComponents,
       type,
       normalize,
       stride,
       offset
     );
-    gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+    gl.enableVertexAttribArray(this.programInfo.attribLocations.vertexPosition);
   }
 
   const numComponents = 4;
@@ -172,26 +193,26 @@ Graphics.prototype.drawScene = function (programInfo, deltaTime) {
   const offset = 0;
   gl.bindBuffer(gl.ARRAY_BUFFER, this.buffers.color);
   gl.vertexAttribPointer(
-    programInfo.attribLocations.vertexColor,
+    this.programInfo.attribLocations.vertexColor,
     numComponents,
     type,
     normalize,
     stride,
     offset
   );
-  gl.enableVertexAttribArray(programInfo.attribLocations.vertexColor);
+  gl.enableVertexAttribArray(this.programInfo.attribLocations.vertexColor);
 
   // Tell WebGL to use our program when drawing
-  gl.useProgram(programInfo.program);
+  gl.useProgram(this.programInfo.program);
 
   // Set the shader uniforms
   gl.uniformMatrix4fv(
-    programInfo.uniformLocations.projectionMatrix,
+    this.programInfo.uniformLocations.projectionMatrix,
     false,
     projectionMatrix
   );
   gl.uniformMatrix4fv(
-    programInfo.uniformLocations.modelViewMatrix,
+    this.programInfo.uniformLocations.modelViewMatrix,
     false,
     modelViewMatrix
   );
@@ -212,24 +233,24 @@ Graphics.prototype.drawScene = function (programInfo, deltaTime) {
 
 // };
 
-Graphics.prototype.render = function (now) {
+Graphics3D.prototype.render = function (now) {
   now *= 0.001; // convert to seconds
   deltaTime = now - then;
   then = now;
 
   // console.log(this);
   // console.log(deltaTime);
-  this.drawScene(programInfo, deltaTime);
+  this.drawScene(this.programInfo, deltaTime);
   // squareRotation += deltaTime;
 
-  requestAnimationFrame(Graphics.prototype.render.bind(this));
+  requestAnimationFrame(Graphics3D.prototype.render.bind(this));
 };
 
-Graphics.prototype.startRendering = function () {
-  requestAnimationFrame(Graphics.prototype.render.bind(this));
+Graphics3D.prototype.startRendering = function () {
+  requestAnimationFrame(Graphics3D.prototype.render.bind(this));
 };
 
-Graphics.prototype.resize = function (width, height) {
+Graphics3D.prototype.resize = function (width, height) {
   const dpr = window.devicePixelRatio || 1;
   this.canvas.width = width * dpr;
   this.canvas.height = height * dpr;

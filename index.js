@@ -158,7 +158,7 @@ if (canvas instanceof HTMLCanvasElement) {
     const fsSource =
     "varying lowp vec4 vColor; void main() { gl_FragColor = vColor; }";
 
-    const graphics = new Graphics(canvas);
+    const graphics = new Graphics3D(canvas);
     const gl = graphics.gl;
     graphics.clear();
     graphics.loadShaders(vsSource, fsSource);
