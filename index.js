@@ -13,7 +13,6 @@ precision highp float;
 uniform vec2 iResolution;
 uniform sampler2D pattern;
 uniform sampler2D depthBuffer;
-uniform float frameSeed;
 varying vec2 vUv;
 
 float random(vec2 st) {
@@ -49,15 +48,15 @@ void main() {
     bool isAnchorZone = relativeX < 0.05; 
     float anchorNoise = random(vec2(0.5, floor(y))); // floor(y) makes it blocky noise
 
-    if (isAnchorZone) {
+    if (isAnchorZone && false) {
         // Black background with noisy white pixels as anchors
         float brightness = (anchorNoise > 0.8) ? 1.0 : 0.0;
         gl_FragColor = vec4(vec3(brightness), 1.0);
     } else {
-        // Procedural strip pattern that changes every frame.
-        float stripX = floor(patternUV.x * 96.0);
-        float stripY = floor(patternUV.y * 18.0);
-        float noise = random(vec2(stripX + frameSeed, stripY));
+        // Procedural strip pattern, stable within a frame so it does not drift.
+        float stripX = floor(patternUV.x * 256.0);
+        float stripY = floor(patternUV.y * 64.0);
+        float noise = random(vec2(stripX, stripY));
         gl_FragColor = vec4(vec3(noise), 1.0);
     }
 }
@@ -111,10 +110,8 @@ function init() {
 
     const resLoc = gl.getUniformLocation(program, "iResolution");
     gl.uniform2f(resLoc, canvas.width, canvas.height);
-    const frameSeedLoc = gl.getUniformLocation(program, "frameSeed");
 
     let depthTexture = null;
-    let frameSeed = 0.0;
 
     function ensureDepthTexture() {
         if (depthTexture) return depthTexture;
@@ -195,8 +192,6 @@ function init() {
 
     function draw() {
         if (!gl) return;
-        frameSeed += 1.0;
-        gl.uniform1f(frameSeedLoc, frameSeed);
         gl.clear(gl.COLOR_BUFFER_BIT);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
@@ -216,7 +211,7 @@ if (canvas instanceof HTMLCanvasElement) {
     varying highp float vDepth;
     void main() {
         // Pure grayscale depth gradient, flipped so the foreground is white.
-        float depth = 1.0 - smoothstep(3.0, 7.0, vDepth);
+        float depth = 1.0 - smoothstep(2.0, 7.0, vDepth);
         gl_FragColor = vec4(vec3(depth), 1.0);
     }
 `;
