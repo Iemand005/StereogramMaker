@@ -15,6 +15,10 @@ uniform sampler2D pattern;
 uniform sampler2D depthBuffer;
 varying vec2 vUv;
 
+float random(vec2 st) {
+    return fract(sin(dot(st.xy, vec2(12.9898, 78.233))) * 43758.5453123);
+}
+
 void main() {
     float numTiles = 6.0;
     float maxDepthShift = 20.0; // Adjust this for more/less 3D pop
@@ -44,7 +48,9 @@ void main() {
     // 4. Sample the pattern using the final X we landed on
     // Normalize X by tileWidth so the pattern repeats properly
     vec2 patternUV = vec2(currX / tileWidth, y / iResolution.y);
-    gl_FragColor = texture2D(pattern, patternUV);
+    //gl_FragColor = texture2D(pattern, patternUV);
+    /// I hope yo
+    gl_FragColor = vec4(vec3(random(patternUV)), 1); 
     if (deep) gl_FragColor *= vec4(1,0,0,1);
 }
 `;
