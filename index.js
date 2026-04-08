@@ -1,4 +1,4 @@
-const vertShader = `
+const stereoVertShader = `
 attribute vec3 position;
 varying vec2 vUv;
 
@@ -8,7 +8,7 @@ void main() {
 }
 `;
 
-const fragShader = `
+const stereoFragShader = `
 precision highp float;
 uniform vec2 iResolution;
 uniform sampler2D pattern;
@@ -21,275 +21,383 @@ float random(vec2 st) {
 
 void main() {
     float numTiles = 6.0;
-    float maxDepthShift = 25.0; 
+    float maxDepthShift = 25.0;
     float tileWidth = iResolution.x / numTiles;
-    
+
     float x = gl_FragCoord.x;
     float y = gl_FragCoord.y;
 
-    // 1. The Stereogram Chain
     for (int i = 0; i < 30; i++) {
         if (x < tileWidth) break;
-        
-        // Sample depth at the current tracing point
         float d = texture2D(depthBuffer, vec2(x, y) / iResolution.xy).r;
-        
-        // The jump
         x -= (tileWidth - d * maxDepthShift);
     }
-    
-    // 2. Normalize x to the [0, 1] range of the first tile
+
     float relativeX = x / tileWidth;
     vec2 patternUV = vec2(relativeX, y / iResolution.y);
 
-    // 3. Create the "Noisy Anchor Bar"
-    // We use a fixed seed based on 'y' and a tiny 'x' range 
-    // so the noise is identical in every repetition's anchor.
-    bool isAnchorZone = relativeX < 0.05; 
-    float anchorNoise = random(vec2(0.5, floor(y))); // floor(y) makes it blocky noise
+    bool isAnchorZone = relativeX < 0.05;
+    float anchorNoise = random(vec2(0.5, floor(y)));
 
     if (isAnchorZone && false) {
-        // Black background with noisy white pixels as anchors
         float brightness = (anchorNoise > 0.8) ? 1.0 : 0.0;
         gl_FragColor = vec4(vec3(brightness), 1.0);
     } else {
-        // Normal pattern
         gl_FragColor = texture2D(pattern, patternUV);
     }
 }
 `;
 
+const cubeVertShader = `
+attribute vec3 position;
+uniform mat4 uModelViewMatrix;
+uniform mat4 uProjectionMatrix;
+varying highp float vDepth;
+
+void main() {
+    vec4 mvPosition = uModelViewMatrix * vec4(position, 1.0);
+    vDepth = -mvPosition.z;
+    gl_Position = uProjectionMatrix * mvPosition;
+}
+`;
+
+const cubeFragShader = `
+precision mediump float;
+varying highp float vDepth;
+
+void main() {
+    float depth = 1.0 - smoothstep(3.0, 7.0, vDepth);
+    gl_FragColor = vec4(vec3(depth), 1.0);
+}
+`;
+
 function init() {
-    const canvas = document.getElementById('autostereogram');
+    const canvas = document.getElementById("autostereogram");
     if (!(canvas instanceof HTMLCanvasElement)) return;
-    const gl = canvas.getContext('webgl');
+
+    const gl = canvas.getContext("webgl");
     if (!gl) return;
 
-    const patternImage = document.getElementById("pattern-image");
-    const depthImage = document.getElementById("depth-image");
+    function compileShader(type, source) {
+        const shader = gl.createShader(type);
+        if (!shader) throw new Error("Unable to create shader");
+        gl.shaderSource(shader, source);
+        gl.compileShader(shader);
 
-    /**
-     * @param {number} type 
-     * @param {string} shaderSource 
-     */
-    function createShader(type, shaderSource) {
-        if (!gl) throw new Error("No GL");
-
-        const s = gl.createShader(type);
-        if (!s) throw new Error("No shader");
-        gl.shaderSource(s, shaderSource);
-        gl.compileShader(s);
-
-        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-            const msg = gl.getShaderInfoLog(s);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+            const msg = gl.getShaderInfoLog(shader) || "Unknown shader error";
             console.error(msg);
-            alert("Shader Error: " + msg);
-            throw new Error(msg || "Unknown error");
+            throw new Error(msg);
         }
 
-        return s;
+        return shader;
     }
 
-    const program = gl.createProgram();
-    gl.attachShader(program, createShader(gl.VERTEX_SHADER, vertShader));
-    gl.attachShader(program, createShader(gl.FRAGMENT_SHADER, fragShader));
-    gl.linkProgram(program);
-    gl.useProgram(program);
+    function createProgram(vsSource, fsSource) {
+        const program = gl.createProgram();
+        if (!program) throw new Error("Unable to create program");
+        gl.attachShader(program, compileShader(gl.VERTEX_SHADER, vsSource));
+        gl.attachShader(program, compileShader(gl.FRAGMENT_SHADER, fsSource));
+        gl.linkProgram(program);
 
-    const buffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            const msg = gl.getProgramInfoLog(program) || "Unknown program error";
+            console.error(msg);
+            throw new Error(msg);
+        }
 
-    const posLoc = gl.getAttribLocation(program, "position");
-    gl.enableVertexAttribArray(posLoc);
-    gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
+        return program;
+    }
 
-    const resLoc = gl.getUniformLocation(program, "iResolution");
-    gl.uniform2f(resLoc, canvas.width, canvas.height);
+    function resizeCanvasToDisplaySize() {
+        const dpr = window.devicePixelRatio || 1;
+        const bounds = canvas.getBoundingClientRect();
+        const width = Math.max(1, Math.floor(bounds.width * dpr));
+        const height = Math.max(1, Math.floor(bounds.height * dpr));
 
-    /**
-     * @param {HTMLImageElement} img 
-     * @param {number} index 
-     */
-    function loadTexture(img, index) {
-        if (!gl) return;
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); 
-        const tex = gl.createTexture();
-        gl.activeTexture(gl.TEXTURE0 + index);
-        gl.bindTexture(gl.TEXTURE_2D, tex);
-        
+        if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        return { width: canvas.width, height: canvas.height };
+    }
+
+    function createTexture(width, height, filter) {
+        const texture = gl.createTexture();
+        if (!texture) throw new Error("Unable to create texture");
+        gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-
-        img.onload = function() {
-            gl.activeTexture(gl.TEXTURE0 + index);
-            gl.bindTexture(gl.TEXTURE_2D, tex);
-            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-            draw();
-        };
-        
-        return tex;
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            width,
+            height,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            null
+        );
+        return texture;
     }
 
-    gl.uniform1i(gl.getUniformLocation(program, "pattern"), 0);
-    gl.uniform1i(gl.getUniformLocation(program, "depthBuffer"), 1);
+    function createRenderTarget(width, height) {
+        const framebuffer = gl.createFramebuffer();
+        const colorTexture = createTexture(width, height, gl.LINEAR);
+        const depthRenderbuffer = gl.createRenderbuffer();
 
-    if (!(patternImage instanceof HTMLImageElement && depthImage instanceof HTMLImageElement)) return;
-    loadTexture(patternImage, 0);
-    loadTexture(depthImage, 1);
+        if (!framebuffer || !depthRenderbuffer) {
+            throw new Error("Unable to create framebuffer resources");
+        }
 
-    function draw() {
-        if (!gl) return;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        gl.framebufferTexture2D(
+            gl.FRAMEBUFFER,
+            gl.COLOR_ATTACHMENT0,
+            gl.TEXTURE_2D,
+            colorTexture,
+            0
+        );
+
+        gl.bindRenderbuffer(gl.RENDERBUFFER, depthRenderbuffer);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+        gl.framebufferRenderbuffer(
+            gl.FRAMEBUFFER,
+            gl.DEPTH_ATTACHMENT,
+            gl.RENDERBUFFER,
+            depthRenderbuffer
+        );
+
+        const status = gl.checkFramebufferStatus(gl.FRAMEBUFFER);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+        if (status !== gl.FRAMEBUFFER_COMPLETE) {
+            throw new Error("Framebuffer is incomplete: " + status);
+        }
+
+        return { framebuffer, colorTexture, depthRenderbuffer, width, height };
+    }
+
+    function resizeRenderTarget(target, width, height) {
+        if (target.width === width && target.height === height) return;
+
+        gl.bindTexture(gl.TEXTURE_2D, target.colorTexture);
+        gl.texImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA,
+            width,
+            height,
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            null
+        );
+
+        gl.bindRenderbuffer(gl.RENDERBUFFER, target.depthRenderbuffer);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, width, height);
+        target.width = width;
+        target.height = height;
+    }
+
+    function createTextureFromImage(image) {
+        const texture = gl.createTexture();
+        if (!texture) throw new Error("Unable to create pattern texture");
+
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+        return texture;
+    }
+
+    const stereoProgram = createProgram(stereoVertShader, stereoFragShader);
+    const cubeProgram = createProgram(cubeVertShader, cubeFragShader);
+
+    const quadBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+    gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([
+            -1, -1,
+            1, -1,
+            -1, 1,
+            -1, 1,
+            1, -1,
+            1, 1
+        ]),
+        gl.STATIC_DRAW
+    );
+
+    const cubePositionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, cubePositionBuffer);
+    gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Float32Array([
+            -1.0, -1.0, 1.0,  1.0, -1.0, 1.0,  1.0, 1.0, 1.0,  -1.0, 1.0, 1.0,
+            -1.0, -1.0, -1.0, -1.0, 1.0, -1.0,  1.0, 1.0, -1.0,  1.0, -1.0, -1.0,
+            -1.0, 1.0, -1.0,  -1.0, 1.0, 1.0,   1.0, 1.0, 1.0,   1.0, 1.0, -1.0,
+            -1.0, -1.0, -1.0,  1.0, -1.0, -1.0,  1.0, -1.0, 1.0,  -1.0, -1.0, 1.0,
+            1.0, -1.0, -1.0,   1.0, 1.0, -1.0,   1.0, 1.0, 1.0,   1.0, -1.0, 1.0,
+            -1.0, -1.0, -1.0,  -1.0, -1.0, 1.0,  -1.0, 1.0, 1.0,  -1.0, 1.0, -1.0
+        ]),
+        gl.STATIC_DRAW
+    );
+
+    const cubeIndexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeIndexBuffer);
+    gl.bufferData(
+        gl.ELEMENT_ARRAY_BUFFER,
+        new Uint16Array([
+            0, 1, 2, 0, 2, 3,
+            4, 5, 6, 4, 6, 7,
+            8, 9, 10, 8, 10, 11,
+            12, 13, 14, 12, 14, 15,
+            16, 17, 18, 16, 18, 19,
+            20, 21, 22, 20, 22, 23
+        ]),
+        gl.STATIC_DRAW
+    );
+
+    const stereoPositionLoc = gl.getAttribLocation(stereoProgram, "position");
+    const stereoResolutionLoc = gl.getUniformLocation(stereoProgram, "iResolution");
+    const stereoPatternLoc = gl.getUniformLocation(stereoProgram, "pattern");
+    const stereoDepthLoc = gl.getUniformLocation(stereoProgram, "depthBuffer");
+
+    const cubePositionLoc = gl.getAttribLocation(cubeProgram, "position");
+    const cubeModelViewLoc = gl.getUniformLocation(cubeProgram, "uModelViewMatrix");
+    const cubeProjectionLoc = gl.getUniformLocation(cubeProgram, "uProjectionMatrix");
+
+    const patternImage = document.getElementById("pattern-image");
+    let patternTexture = null;
+    let patternReady = false;
+
+    if (patternImage instanceof HTMLImageElement) {
+        const uploadPattern = () => {
+            patternTexture = createTextureFromImage(patternImage);
+            patternReady = true;
+        };
+
+        if (patternImage.complete && patternImage.naturalWidth > 0) {
+            uploadPattern();
+        } else {
+            patternImage.onload = uploadPattern;
+            patternImage.onerror = () => {
+                console.error("Pattern image failed to load");
+            };
+        }
+    }
+
+    let renderTarget = null;
+    let currentWidth = 0;
+    let currentHeight = 0;
+    let cubeRotation = 0;
+
+    function ensureRenderTarget() {
+        const size = resizeCanvasToDisplaySize();
+        if (!renderTarget || size.width !== currentWidth || size.height !== currentHeight) {
+            renderTarget = createRenderTarget(size.width, size.height);
+            currentWidth = size.width;
+            currentHeight = size.height;
+            gl.useProgram(stereoProgram);
+            gl.uniform2f(stereoResolutionLoc, currentWidth, currentHeight);
+        }
+    }
+
+    function drawCubeToTarget(deltaSeconds) {
+        if (!renderTarget) return;
+
+        cubeRotation += deltaSeconds;
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, renderTarget.framebuffer);
+        gl.viewport(0, 0, currentWidth, currentHeight);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        gl.enable(gl.DEPTH_TEST);
+        gl.depthFunc(gl.LEQUAL);
+
+        const projectionMatrix = mat4.create();
+        mat4.perspective(
+            projectionMatrix,
+            (45 * Math.PI) / 180,
+            currentWidth / currentHeight,
+            0.1,
+            100.0
+        );
+
+        const modelViewMatrix = mat4.create();
+        mat4.translate(modelViewMatrix, modelViewMatrix, [0.0, 0.0, -6.0]);
+        mat4.rotate(modelViewMatrix, modelViewMatrix, cubeRotation, [0, 0, 1]);
+        mat4.rotate(modelViewMatrix, modelViewMatrix, cubeRotation * 0.7, [0, 1, 0]);
+        mat4.rotate(modelViewMatrix, modelViewMatrix, cubeRotation * 0.3, [1, 0, 0]);
+
+        gl.useProgram(cubeProgram);
+        gl.bindBuffer(gl.ARRAY_BUFFER, cubePositionBuffer);
+        gl.vertexAttribPointer(cubePositionLoc, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(cubePositionLoc);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, cubeIndexBuffer);
+        gl.uniformMatrix4fv(cubeProjectionLoc, false, projectionMatrix);
+        gl.uniformMatrix4fv(cubeModelViewLoc, false, modelViewMatrix);
+        gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
+    }
+
+    function drawStereogram() {
+        if (!patternReady || !patternTexture || !renderTarget) return;
+
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, currentWidth, currentHeight);
+        gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT);
+
+        gl.useProgram(stereoProgram);
+        gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
+        gl.vertexAttribPointer(stereoPositionLoc, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(stereoPositionLoc);
+
+        gl.uniform2f(stereoResolutionLoc, currentWidth, currentHeight);
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, patternTexture);
+        gl.uniform1i(stereoPatternLoc, 0);
+
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_2D, renderTarget.colorTexture);
+        gl.uniform1i(stereoDepthLoc, 1);
+
+        gl.disable(gl.DEPTH_TEST);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 
+    let lastTime = 0;
+    function frame(now) {
+        ensureRenderTarget();
+        const deltaSeconds = lastTime ? (now - lastTime) / 1000 : 0;
+        lastTime = now;
+
+        if (patternReady && renderTarget) {
+            drawCubeToTarget(deltaSeconds);
+            drawStereogram();
+        }
+
+        requestAnimationFrame(frame);
+    }
+
+    window.addEventListener("resize", () => {
+        currentWidth = 0;
+        currentHeight = 0;
+        ensureRenderTarget();
+    });
+
+    ensureRenderTarget();
+    requestAnimationFrame(frame);
 }
 
 init();
-
-
-
-const canvas = document.getElementById("canvas");
-if (canvas instanceof HTMLCanvasElement) {
-    const vsSource =
-    "attribute vec4 aVertexPosition; attribute vec4 aVertexColor; uniform mat4 uModelViewMatrix; uniform mat4 uProjectionMatrix; varying highp float vDepth; void main() { vec4 mvPosition = uModelViewMatrix * aVertexPosition; vDepth = -mvPosition.z; gl_Position = uProjectionMatrix * mvPosition; }";
-    const fsSource = `
-    precision mediump float;
-    varying highp float vDepth;
-    void main() {
-        // Pure grayscale depth gradient, flipped so the foreground is white.
-        float depth = 1.0 - smoothstep(3.0, 7.0, vDepth);
-        gl_FragColor = vec4(vec3(depth), 1.0);
-    }
-`;
-
-    const graphics = new Graphics3D(canvas);
-    const gl = graphics.gl;
-    graphics.setClearColor(0, 0, 0, 1);
-    graphics.clear();
-    graphics.loadShaders(vsSource, fsSource);
-
-    const programInfo = {
-    program: graphics.shaderProgram,
-    attribLocations: {
-        vertexPosition: gl.getAttribLocation(
-        graphics.shaderProgram,
-        "aVertexPosition"
-        ),
-        vertexColor: gl.getAttribLocation(graphics.shaderProgram, "aVertexColor")
-    },
-    uniformLocations: {
-        projectionMatrix: gl.getUniformLocation(
-        graphics.shaderProgram,
-        "uProjectionMatrix"
-        ),
-        modelViewMatrix: gl.getUniformLocation(
-        graphics.shaderProgram,
-        "uModelViewMatrix"
-        )
-    }
-    };
-
-    const positionBuffer = gl.createBuffer();
-
-    // Select the positionBuffer as the one to apply buffer
-    // operations to from here out.
-    gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-
-    // Now create an array of positions for the square.
-    // const positions = [1.0, 1.0, -1.0, 1.0, 1.0, -1.0, -1.0, -1.0];y
-
-    const positions = [
-    // Front face
-    -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0, 1.0,
-
-    // Back face
-    -1.0, -1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0, -1.0,
-
-    // Top face
-    -1.0, 1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, -1.0,
-
-    // Bottom face
-    -1.0, -1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, 1.0, -1.0, -1.0, 1.0,
-
-    // Right face
-    1.0, -1.0, -1.0, 1.0, 1.0, -1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0,
-
-    // Left face
-    -1.0, -1.0, -1.0, -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0, -1.0
-    ];
-
-    // Now pass the list of positions into WebGL to build the
-    // shape. We do this by creating a Float32Array from the
-    // JavaScript array, then use it to fill the current buffer.
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-
-    const indexBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-
-    // This array defines each face as two triangles, using the
-    // indices into the vertex array to specify each triangle's
-    // position.
-
-    // prettier-ignore
-    const indices = [
-    0, 1, 2, 0, 2, 3,    // front
-    4, 5, 6, 4, 6, 7,    // back
-    8, 9, 10, 8, 10, 11,   // top
-    12, 13, 14, 12, 14, 15,   // bottom
-    16, 17, 18, 16, 18, 19,   // right
-    20, 21, 22, 20, 22, 23   // left
-    ];
-
-    const faceColors = [
-    [1.0, 1.0, 1.0, 1.0], // Front face: white
-    [1.0, 0.0, 0.0, 1.0], // Back face: red
-    [0.0, 1.0, 0.0, 1.0], // Top face: green
-    [0.0, 0.0, 1.0, 1.0], // Bottom face: blue
-    [1.0, 1.0, 0.0, 1.0], // Right face: yellow
-    [1.0, 0.0, 1.0, 1.0] // Left face: purple
-    ];
-
-    // Convert the array of colors into a table for all the vertices.
-
-    let colors = [];
-
-    for (let cIndex in faceColors) {
-    // Repeat each color four times for the four vertices of the face
-    const c = faceColors[cIndex];
-    colors = colors.concat(c, c, c, c);
-    }
-
-    const colorBuffer = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
-
-    const buffers = {
-    position: positionBuffer,
-    indices: indexBuffer,
-    color: colorBuffer
-    };
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, buffers.indices);
-    gl.bufferData(
-    gl.ELEMENT_ARRAY_BUFFER,
-    new Uint16Array(indices),
-    gl.STATIC_DRAW
-    );
-
-    graphics.buffers = buffers;
-
-    const bounds = canvas.getBoundingClientRect();
-    graphics.resize(bounds.width, bounds.height);
-    graphics.startRendering();
-
-    console.log(graphics);
-
-    window.onresize = function (ev) {
-    const bounds = canvas.getBoundingClientRect();
-    graphics.resize(bounds.width, bounds.height);
-    };
-
-}
