@@ -21,39 +21,40 @@ float random(vec2 st) {
 
 void main() {
     float numTiles = 6.0;
-    float maxDepthShift = 20.0; // Adjust this for more/less 3D pop
+    float maxDepthShift = 25.0; 
     float tileWidth = iResolution.x / numTiles;
     
-    // 2. Current pixel in raw coordinates
-    float currX = gl_FragCoord.x;
+    float x = gl_FragCoord.x;
     float y = gl_FragCoord.y;
 
-    bool deep = texture2D(depthBuffer, gl_FragCoord.xy).x > 0.01;
-
-    // 3. The Stereogram Trace-Back Loop
-    // We look to the left repeatedly, shifting slightly based on depth.
+    // 1. The Stereogram Chain
     for (int i = 0; i < 30; i++) {
-        if (currX < tileWidth) break;
+        if (x < tileWidth) break;
         
-        // IMPORTANT: Normalize coordinates to [0,1] for texture2D
-        vec2 depthUV = vec2(currX, y) / iResolution.xy;
-        float depth = texture2D(depthBuffer, depthUV).r;
-
-        // if (depth > 0.01) deep = true;
+        // Sample depth at the current tracing point
+        float d = texture2D(depthBuffer, vec2(x, y) / iResolution.xy).r;
         
-        // Shift jump: standard width minus the depth-based "pinch"
-        currX -= (tileWidth - depth * maxDepthShift);
+        // The jump
+        x -= (tileWidth - d * maxDepthShift);
     }
     
-    // 4. Sample the pattern using the final X we landed on
-    // Normalize X by tileWidth so the pattern repeats properly
-    vec2 patternUV = vec2(currX / tileWidth, y / iResolution.y);
-    /// I hope yo
-    gl_FragColor = vec4(vec3(random(patternUV)), 1); 
-    gl_FragColor = texture2D(pattern, patternUV);
-    // if (deep) gl_FragColor *= vec4(1,0,0,1);
-    if (patternUV.x < 0.1) if (!(random(patternUV) > 0.5)) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    // 2. Normalize x to the [0, 1] range of the first tile
+    float relativeX = x / tileWidth;
+    vec2 patternUV = vec2(relativeX, y / iResolution.y);
+
+    // 3. Create the "Noisy Anchor Bar"
+    // We use a fixed seed based on 'y' and a tiny 'x' range 
+    // so the noise is identical in every repetition's anchor.
+    bool isAnchorZone = relativeX < 0.05; 
+    float anchorNoise = random(vec2(0.5, floor(y))); // floor(y) makes it blocky noise
+
+    if (isAnchorZone && false) {
+        // Black background with noisy white pixels as anchors
+        float brightness = (anchorNoise > 0.8) ? 1.0 : 0.0;
+        gl_FragColor = vec4(vec3(brightness), 1.0);
+    } else {
+        // Normal pattern
+        gl_FragColor = texture2D(pattern, patternUV);
     }
 }
 `;
