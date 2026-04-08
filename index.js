@@ -1,6 +1,6 @@
 const vertShader = `
-attribute vec3 position; // The x,y,z coordinates of our rectangle corners
-varying vec2 vUv;        // This passes the coordinates to the Pixel Shader
+attribute vec3 position;
+varying vec2 vUv;
 
 void main() {
     vUv = position.xy * 0.5 + 0.5;
