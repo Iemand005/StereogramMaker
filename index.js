@@ -160,7 +160,7 @@ if (canvas instanceof HTMLCanvasElement) {
     varying highp float vDepth;
     void main() {
         // Pure grayscale depth gradient, flipped so the foreground is white.
-        float depth = 1.0 - smoothstep(4.0, 8.0, vDepth);
+        float depth = 1.0 - smoothstep(3.0, 7.0, vDepth);
         gl_FragColor = vec4(vec3(depth), 1.0);
     }
 `;
